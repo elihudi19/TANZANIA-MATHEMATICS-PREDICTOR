@@ -22,6 +22,7 @@ Run locally:
     streamlit run app.py
 """
 
+import io
 import json
 import os
 
@@ -29,6 +30,14 @@ import joblib
 import numpy as np
 import pandas as pd
 import streamlit as st
+
+# Try to import ReportLab for PDF generation; if not available we'll fall back to a text report.
+try:
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+    REPORTLAB_AVAILABLE = True
+except Exception:
+    REPORTLAB_AVAILABLE = False
 
 # --------------------------------------------------------------------------- #
 # Page configuration
@@ -217,6 +226,107 @@ def strength_note_for(feature, value_raw, lang="English"):
     return table.get(feature, "This factor is currently helping.")
 
 
+def generate_pdf_report(raw_values, prediction, probability_pass, contributions, feature_config, language="English"):
+    """Generate a PDF (bytes) summarising the student's inputs, prediction and suggestions.
+
+    Falls back to a plain text file if ReportLab is not available.
+    """
+    if REPORTLAB_AVAILABLE:
+        buffer = io.BytesIO()
+        c = canvas.Canvas(buffer, pagesize=letter)
+        width, height = letter
+        x_margin = 40
+        y = height - 40
+
+        title = "Mwanza Mathematics - Student Report" if language == "English" else "Ripoti ya Mwanafunzi - Hisabati Mwanza"
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(x_margin, y, title)
+        y -= 30
+
+        c.setFont("Helvetica", 11)
+        # Inputs
+        c.drawString(x_margin, y, ("Inputs:" if language == "English" else "Maelezo:"))
+        y -= 18
+        for k, v in raw_values.items():
+            label = FRIENDLY_NAMES.get(k, k)
+            c.drawString(x_margin + 10, y, f"{label}: {v}")
+            y -= 14
+
+        y -= 6
+        # Prediction
+        pred_text = "PASS" if prediction == 1 else "FAIL"
+        c.drawString(x_margin, y, (f"Predicted result: {pred_text}" if language == "English" else f"Matokeo yaliyotabiriwa: {pred_text}"))
+        y -= 16
+        c.drawString(x_margin, y, (f"Probability of passing: {probability_pass*100:.1f}%" if language == "English" else f"Uwezekano wa kupita: {probability_pass*100:.1f}%"))
+        y -= 20
+
+        # Top suggestions
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(x_margin, y, ("Top suggestions:" if language == "English" else "Mapendekezo kuu:"))
+        y -= 16
+        c.setFont("Helvetica", 10)
+        sorted_factors = sorted(contributions.items(), key=lambda kv: kv[1])
+        risk_factors = [f for f in sorted_factors if f[1] < 0]
+        for i, (feat, contrib) in enumerate(risk_factors[:5], start=1):
+            suggestion = suggestion_for(feat, raw_values[feat], lang=language)
+            friendly = FRIENDLY_NAMES.get(feat, feat)
+            text = f"{i}. {friendly}: {suggestion}"
+            # wrap text manually
+            for line in _wrap_text(text, 90):
+                c.drawString(x_margin + 6, y, line)
+                y -= 12
+                if y < 50:
+                    c.showPage()
+                    y = height - 40
+        c.showPage()
+        c.save()
+        buffer.seek(0)
+        return buffer.read()
+
+    # Fallback: plain text bytes
+    lines = []
+    lines.append("Mwanza Mathematics - Student Report")
+    lines.append("")
+    lines.append("Inputs:")
+    for k, v in raw_values.items():
+        label = FRIENDLY_NAMES.get(k, k)
+        lines.append(f"- {label}: {v}")
+    lines.append("")
+    pred_text = "PASS" if prediction == 1 else "FAIL"
+    lines.append(f"Predicted result: {pred_text}")
+    lines.append(f"Probability of passing: {probability_pass*100:.1f}%")
+    lines.append("")
+    lines.append("Top suggestions:")
+    sorted_factors = sorted(contributions.items(), key=lambda kv: kv[1])
+    risk_factors = [f for f in sorted_factors if f[1] < 0]
+    for i, (feat, contrib) in enumerate(risk_factors[:5], start=1):
+        suggestion = suggestion_for(feat, raw_values[feat], lang=language)
+        friendly = FRIENDLY_NAMES.get(feat, feat)
+        lines.append(f"{i}. {friendly}: {suggestion}")
+
+    txt = "\n".join(lines)
+    return txt.encode("utf-8")
+
+
+def _wrap_text(text, width):
+    """Simple helper to wrap long lines for the PDF generator."""
+    words = text.split()
+    lines = []
+    cur = []
+    cur_len = 0
+    for w in words:
+        if cur_len + len(w) + (1 if cur else 0) > width:
+            lines.append(" ".join(cur))
+            cur = [w]
+            cur_len = len(w)
+        else:
+            cur.append(w)
+            cur_len += len(w) + (1 if cur else 0)
+    if cur:
+        lines.append(" ".join(cur))
+    return lines
+
+
 # --------------------------------------------------------------------------- #
 # Load everything
 # --------------------------------------------------------------------------- #
@@ -259,30 +369,46 @@ if load_error:
     st.error(
         "Could not load the trained models. Please make sure you have run "
         "`python train_model.py` in this project folder first, and that the "
-        f"`model_artifacts/` directory sits next to `app.py`.\n\nDetails: {load_error}"
+        f"`model_artifacts/` directory sits next to `app.py`.
+\n\nDetails: {load_error}"
     )
     st.stop()
 
 tab_predict, tab_performance = st.tabs(["🔮 Prediction", "📊 Model Performance"])
 
 # --------------------------------------------------------------------------- #
-# Prediction tab
+# Prediction tab (uses a form now)
 # --------------------------------------------------------------------------- #
 with tab_predict:
-    col1, col2 = st.columns(2)
+    st.write("Use the form below to enter student information and press 'Predict Result'.")
 
-    with col1:
-        school_type = st.selectbox("School Type", ["Private", "Government"])
-        ratio = st.slider("Teacher-to-student ratio (students per teacher)", 50, 300, 100, step=1)
-        attendance = st.slider("Attendance rate (%)", 50, 99, 80, step=1)
+    with st.form("prediction_form"):
+        col1, col2 = st.columns(2)
 
-    with col2:
-        has_book = st.selectbox("Does the student own a Mathematics book?", ["Own a Book", "Not Own Book"])
-        mock_grade = st.selectbox("Mock examination grade", ["A", "B", "C", "D", "F"])
+        with col1:
+            school_type = st.selectbox("School Type", ["Private", "Government"])
+            ratio = st.number_input(
+                "Teacher-to-student ratio (students per teacher)",
+                min_value=10,
+                max_value=500,
+                value=100,
+                step=1,
+            )
+            attendance = st.number_input(
+                "Attendance rate (%)",
+                min_value=0,
+                max_value=100,
+                value=80,
+                step=1,
+            )
 
-    predict_clicked = st.button("Predict Result", type="primary")
+        with col2:
+            has_book = st.selectbox("Does the student own a Mathematics book?", ["Own a Book", "Not Own Book"])
+            mock_grade = st.selectbox("Mock examination grade", ["A", "B", "C", "D", "F"])
 
-    if predict_clicked:
+        predict_submitted = st.form_submit_button("Predict Result")
+
+    if predict_submitted:
         try:
             input_row = build_input_row(
                 school_type, ratio, attendance, has_book, mock_grade, feature_config
@@ -369,6 +495,27 @@ with tab_predict:
                     ]
                 )
                 st.dataframe(contrib_df, use_container_width=True, hide_index=True)
+
+            # Provide a downloadable student report (PDF if ReportLab is installed)
+            pdf_bytes = generate_pdf_report(raw_values, prediction, probability_pass, contributions, feature_config, language=language)
+            if REPORTLAB_AVAILABLE:
+                st.download_button(
+                    label=("Download student report (PDF)" if language == "English" else "Pakua ripoti ya mwanafunzi (PDF)"),
+                    data=pdf_bytes,
+                    file_name="student_report.pdf",
+                    mime="application/pdf",
+                )
+            else:
+                st.warning(
+                    "ReportLab is not installed on this environment. The report will be provided as a plain text file. "
+                    "Install ReportLab (`pip install reportlab`) for a PDF output."
+                )
+                st.download_button(
+                    label=("Download student report (TXT)" if language == "English" else "Pakua ripoti ya mwanafunzi (TXT)"),
+                    data=pdf_bytes,
+                    file_name="student_report.txt",
+                    mime="text/plain",
+                )
 
         except Exception as exc:  # noqa: BLE001
             st.error(f"Something went wrong while generating the prediction: {exc}")
