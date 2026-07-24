@@ -24,11 +24,18 @@ Run locally:
 
 import json
 import os
+from datetime import datetime
+from io import BytesIO
 
 import joblib
 import numpy as np
 import pandas as pd
 import streamlit as st
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle
+from reportlab.lib import colors
 
 # --------------------------------------------------------------------------- #
 # Page configuration
@@ -217,6 +224,148 @@ def strength_note_for(feature, value_raw, lang="English"):
     return table.get(feature, "This factor is currently helping.")
 
 
+def generate_pdf_report(
+    school_type, ratio, attendance, has_book, mock_grade, model_choice,
+    prediction, probability_pass, contributions, raw_values, language
+):
+    """Generate a PDF report of the prediction and suggestions."""
+    pdf_buffer = BytesIO()
+    doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    story = []
+
+    # Custom styles
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        textColor=colors.HexColor('#1f77b4'),
+        spaceAfter=12,
+        alignment=1  # center
+    )
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor=colors.HexColor('#1f77b4'),
+        spaceAfter=10,
+        spaceBefore=10
+    )
+
+    # Title
+    report_title = "Mwanza Mathematics Performance Prediction Report" if language == "English" else "Ripoti ya Utabiri wa Utendaji wa Hisabati wa Mwanza"
+    story.append(Paragraph(report_title, title_style))
+    story.append(Spacer(1, 0.2*inch))
+
+    # Generate timestamp
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    story.append(Paragraph(f"<b>Generated:</b> {timestamp}", styles['Normal']))
+    story.append(Spacer(1, 0.2*inch))
+
+    # Student Information Section
+    info_title = "Student Information" if language == "English" else "Habari za Mwanafunzi"
+    story.append(Paragraph(info_title, heading_style))
+
+    student_info = [
+        ["School Type", school_type],
+        ["Teacher-to-student Ratio", f"{ratio}:1"],
+        ["Attendance Rate", f"{attendance}%"],
+        ["Mathematics Book", has_book],
+        ["Mock Examination Grade", mock_grade],
+    ]
+    if language == "Swahili":
+        student_info = [
+            ["Aina ya Shule", school_type],
+            ["Uwiano wa Mwalimu kwa Wanafunzi", f"{ratio}:1"],
+            ["Kiwango cha Mahudhurio", f"{attendance}%"],
+            ["Kitabu cha Hisabati", has_book],
+            ["Alama ya Mtihani wa Maandalizi", mock_grade],
+        ]
+
+    t = Table(student_info, colWidths=[3*inch, 2.5*inch])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 1, colors.grey)
+    ]))
+    story.append(t)
+    story.append(Spacer(1, 0.3*inch))
+
+    # Prediction Result Section
+    result_title = "Prediction Result" if language == "English" else "Matokeo ya Utabiri"
+    story.append(Paragraph(result_title, heading_style))
+
+    result_text = "PASS ✅" if prediction == 1 else "FAIL ❌"
+    prob_text = f"{probability_pass * 100:.1f}%"
+    model_text = f"Model: {model_choice}"
+
+    prediction_info = [
+        ["Predicted Outcome", result_text],
+        ["Probability of Passing", prob_text],
+        ["Model Used", model_text],
+    ]
+    if language == "Swahili":
+        prediction_info = [
+            ["Matokeo ya Kutabiri", result_text],
+            ["Uwezekano wa Kupitisha", prob_text],
+            ["Mtindo Uliotumika", model_text],
+        ]
+
+    t2 = Table(prediction_info, colWidths=[3*inch, 2.5*inch])
+    t2.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 1, colors.grey)
+    ]))
+    story.append(t2)
+    story.append(Spacer(1, 0.3*inch))
+
+    # Suggestions Section
+    sugg_title = "Personalised Suggestions" if language == "English" else "Ushauri wa Kibinafsi"
+    story.append(Paragraph(sugg_title, heading_style))
+
+    sorted_factors = sorted(contributions.items(), key=lambda kv: kv[1])
+    risk_factors = [f for f in sorted_factors if f[1] < 0]
+
+    if not risk_factors:
+        msg = (
+            "All measured factors are currently working in this student's favor. "
+            "Keep up the strong routine!"
+            if language == "English"
+            else "Vigezo vyote vinavyopimwa kwa sasa vinamsaidia mwanafunzi huyu. "
+            "Endelea na mwenendo huu mzuri!"
+        )
+        story.append(Paragraph(msg, styles['Normal']))
+    else:
+        focus_msg = (
+            "Focus on these areas first, ranked from most to least impactful:"
+            if language == "English"
+            else "Anza na maeneo haya, kwa mpangilio wa athari kubwa hadi ndogo:"
+        )
+        story.append(Paragraph(focus_msg, styles['Normal']))
+        story.append(Spacer(1, 0.15*inch))
+
+        for i, (feat, contrib) in enumerate(risk_factors[:3], start=1):
+            friendly = FRIENDLY_NAMES.get(feat, feat)
+            text = suggestion_for(feat, raw_values[feat], lang=language)
+            story.append(Paragraph(f"<b>{i}. {friendly}</b>", styles['Normal']))
+            story.append(Paragraph(text, styles['Normal']))
+            story.append(Spacer(1, 0.1*inch))
+
+    # Build PDF
+    doc.build(story)
+    pdf_buffer.seek(0)
+    return pdf_buffer
+
+
 # --------------------------------------------------------------------------- #
 # Load everything
 # --------------------------------------------------------------------------- #
@@ -269,13 +418,12 @@ tab_predict, tab_performance = st.tabs(["🔮 Prediction", "📊 Model Performan
 # Prediction tab
 # --------------------------------------------------------------------------- #
 with tab_predict:
-    col1, col2 = st.columns(2)
+    with st.form(key="metrics_form"):
+        col1, col2 = st.columns(2)
 
-    with col1:
-        school_type = st.selectbox("School Type", ["Private", "Government"])
-        
-        with st.form(key="metrics_form"):
+        with col1:
             st.subheader("Input Parameters")
+            school_type = st.selectbox("School Type", ["Private", "Government"])
 
             ratio = st.number_input(
                 label="Teacher-to-student ratio (students per teacher)",
@@ -293,12 +441,15 @@ with tab_predict:
                 step=1,
             )
 
-    with col2:
-        has_book = st.selectbox("Does the student own a Mathematics book?", ["Own a Book", "Not Own Book"])
-        mock_grade = st.selectbox("Mock examination grade", ["A", "B", "C", "D", "F"])
+        with col2:
+            has_book = st.selectbox("Does the student own a Mathematics book?", ["Own a Book", "Not Own Book"])
+            mock_grade = st.selectbox("Mock examination grade", ["A", "B", "C", "D", "F"])
 
-        predict_clicked = st.button("Predict Result", type="primary")
-    try:
+            st.markdown("")  # spacing
+            predict_clicked = st.form_submit_button("Predict Result", type="primary")
+
+    if predict_clicked:
+        try:
             input_row = build_input_row(
                 school_type, ratio, attendance, has_book, mock_grade, feature_config
             )
@@ -385,7 +536,24 @@ with tab_predict:
                 )
                 st.dataframe(contrib_df, use_container_width=True, hide_index=True)
 
-            except Exception as exc:  # noqa: BLE001
+            # --------------------------------------------------------- #
+            # PDF Download Button
+            # --------------------------------------------------------- #
+            st.markdown("---")
+            pdf_buffer = generate_pdf_report(
+                school_type, ratio, attendance, has_book, mock_grade, model_choice,
+                prediction, probability_pass, contributions, raw_values, language
+            )
+            
+            download_label = "📥 Download Student Report (PDF)" if language == "English" else "📥 Pakua Ripoti ya Mwanafunzi (PDF)"
+            st.download_button(
+                label=download_label,
+                data=pdf_buffer,
+                file_name=f"student_prediction_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                mime="application/pdf"
+            )
+
+        except Exception as exc:  # noqa: BLE001
             st.error(f"Something went wrong while generating the prediction: {exc}")
 
 # --------------------------------------------------------------------------- #
