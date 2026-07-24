@@ -211,14 +211,14 @@ def strength_note_for(feature, value_raw, lang="English"):
         "Attendance": f"Attendance at {value_raw}% is strong and supporting the prediction well.",
         "Mock_Score": "The mock examination grade is a strong positive signal — maintain this momentum.",
         "School_Type_Encoded": "The school type is currently working in the student's favor.",
-        "Has_Book_Encoded": "Owning a Mathematics textbook is helping this student's chances.",
+        "Has_Book_Encoded": f"Owning a Mathematics textbook ({value_raw}) is helping this student's chances.",
     }
     notes_sw = {
         "Teacher-to-student ratio": f"Uwiano wa {value_raw}:1 ni mzuri — endelea hivyo.",
         "Attendance": f"Mahudhurio ya {value_raw}% ni mazuri na yanasaidia matokeo.",
         "Mock_Score": "Alama ya mock ni ishara nzuri — endelea na kasi hiyo.",
         "School_Type_Encoded": "Aina ya shule kwa sasa inamsaidia mwanafunzi huyu.",
-        "Has_Book_Encoded": "Kumiliki kitabu cha Hisabati kunamsaidia mwanafunzi huyu.",
+        "Has_Book_Encoded": f"Kumiliki kitabu cha Hisabati ({value_raw}) kunamsaidia mwanafunzi huyu.",
     }
     table = notes_en if lang == "English" else notes_sw
     return table.get(feature, "This factor is currently helping.")
