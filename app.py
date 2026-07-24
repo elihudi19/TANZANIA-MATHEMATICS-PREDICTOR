@@ -297,8 +297,8 @@ with tab_predict:
         has_book = st.selectbox("Does the student own a Mathematics book?", ["Own a Book", "Not Own Book"])
         mock_grade = st.selectbox("Mock examination grade", ["A", "B", "C", "D", "F"])
 
-    predict_clicked = st.button("Predict Result", type="primary")
-        try:
+        predict_clicked = st.button("Predict Result", type="primary")
+    try:
             input_row = build_input_row(
                 school_type, ratio, attendance, has_book, mock_grade, feature_config
             )
