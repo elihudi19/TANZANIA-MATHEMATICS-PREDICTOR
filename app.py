@@ -173,8 +173,9 @@ def suggestion_for(feature, value_raw, lang="English"):
             "dataset. Extra resource support (learning materials, tutoring) can help offset this."
         ),
         "Has_Book_Encoded": (
-            "The student does not currently own a Mathematics textbook. Providing access to a "
-            "textbook (personal, borrowed, or library copy) is strongly associated with better outcomes."
+            f"The student ({value_raw}) does not currently own a Mathematics textbook. "
+            "Providing access to a textbook (personal, borrowed, or library copy) is strongly "
+            "associated with better outcomes."
         ),
     }
     suggestions_sw = {
@@ -196,8 +197,8 @@ def suggestion_for(feature, value_raw, lang="English"):
             "Msaada wa ziada wa vifaa vya kujifunzia na ufundishaji unaweza kusaidia."
         ),
         "Has_Book_Encoded": (
-            "Mwanafunzi hana kitabu cha Hisabati kwa sasa. Kupata kitabu (binafsi, mkopo, au "
-            "cha maktaba) kunahusiana sana na matokeo bora."
+            f"Mwanafunzi ({value_raw}) hana kitabu cha Hisabati kwa sasa. "
+            "Kupata kitabu (binafsi, mkopo, au cha maktaba) kunahusiana sana na matokeo bora."
         ),
     }
     table = suggestions_en if lang == "English" else suggestions_sw
