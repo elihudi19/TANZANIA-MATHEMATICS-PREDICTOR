@@ -273,9 +273,20 @@ with tab_predict:
 
     with col1:
         school_type = st.selectbox("School Type", ["Private", "Government"])
-        ratio = st.slider("Teacher-to-student ratio (students per teacher)", 50, 300, 100, step=1)
-        attendance = st.slider("Attendance rate (%)", 50, 99, 80, step=1)
+        with st.form(key="metrics_form"):
+    st.subheader("Input Parameters")
 
+    ratio = st.slider(
+        label="Teacher-to-student ratio (students per teacher)",
+        min_value=50,
+        max_value=300,
+        value=100,
+        step=1,
+    )
+
+    attendance = st.slider(
+        label="Attendance rate (%)", min_value=50, max_value=99, value=80, step=1
+    )
     with col2:
         has_book = st.selectbox("Does the student own a Mathematics book?", ["Own a Book", "Not Own Book"])
         mock_grade = st.selectbox("Mock examination grade", ["A", "B", "C", "D", "F"])
