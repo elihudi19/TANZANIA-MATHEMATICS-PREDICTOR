@@ -154,6 +154,27 @@ FRIENDLY_NAMES = {
 
 def suggestion_for(feature, value_raw, lang="English"):
     """Return an actionable suggestion string for a risk factor, in the chosen language."""
+    # Special handling for Has_Book_Encoded to check the actual value
+    if feature == "Has_Book_Encoded":
+        if value_raw == "Own a Book":
+            # This shouldn't be a risk factor if student owns a book, but handle it anyway
+            if lang == "English":
+                return "The student owns a Mathematics textbook, which is positive. Ensure it is being used effectively."
+            else:
+                return "Mwanafunzi ana kitabu cha Hisabati, ambayo ni kitu kizuri. Hakikisha kuwa kinatumiwa kwa ufanisi."
+        else:  # "Not Own Book"
+            if lang == "English":
+                return (
+                    "The student does not currently own a Mathematics textbook. "
+                    "Providing access to a textbook (personal, borrowed, or library copy) is strongly "
+                    "associated with better outcomes."
+                )
+            else:
+                return (
+                    "Mwanafunzi hana kitabu cha Hisabati kwa sasa. "
+                    "Kupata kitabu (binafsi, mkopo, au cha maktaba) kunahusiana sana na matokeo bora."
+                )
+    
     suggestions_en = {
         "Teacher-to-student ratio": (
             f"The teacher-to-student ratio ({value_raw}:1) is high. Advocate for smaller "
@@ -171,11 +192,6 @@ def suggestion_for(feature, value_raw, lang="English"):
         "School_Type_Encoded": (
             "The school type is associated with historically lower NECTA pass rates in this "
             "dataset. Extra resource support (learning materials, tutoring) can help offset this."
-        ),
-        "Has_Book_Encoded": (
-            f"The student ({value_raw}) does not currently own a Mathematics textbook. "
-            "Providing access to a textbook (personal, borrowed, or library copy) is strongly "
-            "associated with better outcomes."
         ),
     }
     suggestions_sw = {
@@ -196,10 +212,6 @@ def suggestion_for(feature, value_raw, lang="English"):
             "Aina ya shule inahusiana na kiwango cha chini cha ufaulu wa NECTA kwenye data hii. "
             "Msaada wa ziada wa vifaa vya kujifunzia na ufundishaji unaweza kusaidia."
         ),
-        "Has_Book_Encoded": (
-            f"Mwanafunzi ({value_raw}) hana kitabu cha Hisabati kwa sasa. "
-            "Kupata kitabu (binafsi, mkopo, au cha maktaba) kunahusiana sana na matokeo bora."
-        ),
     }
     table = suggestions_en if lang == "English" else suggestions_sw
     return table.get(feature, "Review this factor with a teacher for tailored advice.")
@@ -207,19 +219,30 @@ def suggestion_for(feature, value_raw, lang="English"):
 
 def strength_note_for(feature, value_raw, lang="English"):
     """Positive reinforcement message for factors already working in the student's favor."""
+    # Special handling for Has_Book_Encoded based on actual value
+    if feature == "Has_Book_Encoded":
+        if value_raw == "Own a Book":
+            if lang == "English":
+                return "Owning a Mathematics textbook (Own a Book) is helping this student's chances."
+            else:
+                return "Kumiliki kitabu cha Hisabati (Own a Book) kunamsaidia mwanafunzi huyu."
+        else:  # "Not Own Book" - should not appear as positive factor, but handle gracefully
+            if lang == "English":
+                return "Access to Mathematics learning materials is important for success."
+            else:
+                return "Ufikiaji wa vifaa vya kujifunza Hisabati ni muhimu kwa ufaulu."
+    
     notes_en = {
         "Teacher-to-student ratio": f"A teacher-to-student ratio of {value_raw}:1 is favorable — keep it up.",
         "Attendance": f"Attendance at {value_raw}% is strong and supporting the prediction well.",
         "Mock_Score": "The mock examination grade is a strong positive signal — maintain this momentum.",
         "School_Type_Encoded": "The school type is currently working in the student's favor.",
-        "Has_Book_Encoded": f"Owning a Mathematics textbook ({value_raw}) is helping this student's chances.",
     }
     notes_sw = {
         "Teacher-to-student ratio": f"Uwiano wa {value_raw}:1 ni mzuri — endelea hivyo.",
         "Attendance": f"Mahudhurio ya {value_raw}% ni mazuri na yanasaidia matokeo.",
         "Mock_Score": "Alama ya mock ni ishara nzuri — endelea na kasi hiyo.",
         "School_Type_Encoded": "Aina ya shule kwa sasa inamsaidia mwanafunzi huyu.",
-        "Has_Book_Encoded": f"Kumiliki kitabu cha Hisabati ({value_raw}) kunamsaidia mwanafunzi huyu.",
     }
     table = notes_en if lang == "English" else notes_sw
     return table.get(feature, "This factor is currently helping.")
