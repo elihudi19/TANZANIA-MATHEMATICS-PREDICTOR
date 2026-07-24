@@ -385,7 +385,7 @@ with tab_predict:
                 )
                 st.dataframe(contrib_df, use_container_width=True, hide_index=True)
 
-        except Exception as exc:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
             st.error(f"Something went wrong while generating the prediction: {exc}")
 
 # --------------------------------------------------------------------------- #
