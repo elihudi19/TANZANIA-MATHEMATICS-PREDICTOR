@@ -273,8 +273,8 @@ with tab_predict:
 
     with col1:
         school_type = st.selectbox("School Type", ["Private", "Government"])
-        with st.form(key="metrics_form"):
-    st.subheader("Input Parameters")
+    with st.form(key="metrics_form"):
+         st.subheader("Input Parameters")
 
     ratio = st.slider(
         label="Teacher-to-student ratio (students per teacher)",
