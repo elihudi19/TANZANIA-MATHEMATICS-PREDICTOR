@@ -88,8 +88,6 @@ def load_artifacts():
                     "generated 'model_artifacts/' folder included."
                 ) from exc
 
-    # Re-check after the auto-train attempt so a clear error still surfaces
-    # if something (e.g. a missing dataset file) prevented training.
     for path in required_paths:
         if not os.path.exists(path):
             raise FileNotFoundError(
@@ -138,13 +136,10 @@ def compute_contributions(input_row, logreg_model, feature_config):
 
     For categorical 0/1 encoded features (School_Type_Encoded,
     Has_Book_Encoded) the raw encoded value has no such "neutral" meaning —
-    0 and 1 are just labels, not distances from an average. Multiplying the
-    raw value directly by the coefficient means the reference category
-    (whichever one happens to be encoded as 0) always scores exactly 0, even
-    when that category is the worse one. Instead, categorical features are
-    scored relative to their best-outcome category (best = 1 if the
-    coefficient is positive, else 0), so being in the worse category always
-    correctly shows up as a negative contribution.
+    0 and 1 are just labels, not distances from an average. Categorical
+    features are scored relative to their best-outcome category (best = 1
+    if the coefficient is positive, else 0), so being in the worse category
+    always correctly shows up as a negative contribution.
     """
     preprocessor = logreg_model.named_steps["preprocessor"]
     transformed = preprocessor.transform(input_row)  # numeric(scaled) + passthrough
@@ -379,6 +374,19 @@ def generate_pdf_report(
             story.append(Paragraph(text, styles['Normal']))
             story.append(Spacer(1, 0.1*inch))
 
+    # Factors Already Working Well Section
+    positive_factors = [f for f in sorted_factors if f[1] >= 0]
+    if positive_factors:
+        story.append(Spacer(1, 0.15*inch))
+        strengths_title = "✅ Factors Already Working Well" if language == "English" else "✅ Mambo Yanayosaidia Tayari"
+        story.append(Paragraph(strengths_title, heading_style))
+
+        for feat, contrib in positive_factors:
+            friendly = FRIENDLY_NAMES.get(feat, feat)
+            note = strength_note_for(feat, raw_values[feat], lang=language)
+            story.append(Paragraph(f"<b>{friendly}</b> — {note}", styles['Normal']))
+            story.append(Spacer(1, 0.08*inch))
+
     doc.build(story)
     pdf_buffer.seek(0)
     return pdf_buffer
@@ -537,15 +545,6 @@ with tab_predict:
                         friendly = FRIENDLY_NAMES.get(feat, feat)
                         note = strength_note_for(feat, raw_values[feat], lang=language)
                         st.markdown(f"- **{friendly}** — {note}")
-
-            with st.expander("See raw contribution scores (advanced)"):
-                contrib_df = pd.DataFrame(
-                    [
-                        {"Feature": FRIENDLY_NAMES.get(f, f), "Log-odds contribution": round(c, 4)}
-                        for f, c in sorted_factors
-                    ]
-                )
-                st.dataframe(contrib_df, use_container_width=True, hide_index=True)
 
             st.markdown("---")
             pdf_buffer = generate_pdf_report(
