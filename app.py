@@ -190,7 +190,7 @@ def suggestion_for(feature, value_raw, lang="English"):
             "topics missed in the mock exam and consider a structured past-papers practice plan."
         ),
         "School_Type_Encoded": (
-            ​"This school type is hindered by poor studying environment, such as limited study hours. "
+            "This school type is hindered by a poor studying environment, such as limited study hours. "
             "Make sure you clearly arrange your timetable to have enough studying time."
         ),
         "Has_Book_Encoded": (
@@ -213,9 +213,10 @@ def suggestion_for(feature, value_raw, lang="English"):
             "Weka mkazo kwenye mada zilizoshindwa kwenye mock na fanya mazoezi ya maswali ya nyuma."
         ),
         "School_Type_Encoded": (
-            ​"Aina hii ya shule inakwamishwa na mazingira duni ya kujisomea kama vile saa chache za kujisomea. "
+            "Aina hii ya shule inakwamishwa na mazingira duni ya kujisomea kama vile saa chache za kujisomea. "
             "Hakikisha unapanga vizuri ratiba yako ili uwe na muda wa kutosha wa kujisomea."
         ),
+
         "Has_Book_Encoded": (
             "Mwanafunzi hana kitabu cha Hisabati kwa sasa. Kupata kitabu (binafsi, mkopo, au "
             "cha maktaba) kunahusiana sana na matokeo bora."
