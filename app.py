@@ -637,8 +637,6 @@ with tab_performance:
         "Note: the suggestion engine always uses the Logistic Regression coefficients "
         "to explain factor contributions, since they are directly interpretable as "
         "log-odds — even when Random Forest is selected for the headline prediction."
-    
-    st.stop()
     )
 
 tab_predict, tab_performance = st.tabs(["🔮 Prediction", "📊 Model Performance"])
