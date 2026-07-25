@@ -1,40 +1,49 @@
-"""
-app.py
-------
-Mwanza Mathematics Performance Prediction System.
+def compute_contributions(input_row, logreg_model, feature_config):
+    """
+    Standardize the numeric inputs using the SAME fitted scaler used at
+    training time, then multiply by the logistic regression coefficients to
+    get each variable's contribution to the log-odds of passing.
+    A negative contribution means that variable is currently pushing the
+    student toward failing; a positive (or zero) contribution means that
+    variable is at, or pushing toward, its best possible state.
 
-A Streamlit web app that predicts whether a Form Four student in the Mwanza
-Region is likely to PASS or FAIL the NECTA Mathematics examination, using
-either a Logistic Regression or a Random Forest model. The app also produces
-a probability score and a personalised improvement-suggestion list built by
-analysing which input variables are pulling the prediction down.
+    For scaled numeric features (Teacher-to-student ratio, Attendance,
+    Mock_Score) the contribution is simply scaled_value * coefficient, since
+    0 on the standardized scale represents the dataset average.
 
-Folder expected next to this file:
-    model_artifacts/
-        logistic_model.pkl
-        random_forest_model.pkl
-        feature_config.pkl
-        metrics.json
-        confusion_matrix_logreg.png
-        confusion_matrix_rf.png
+    For categorical 0/1 encoded features (School_Type_Encoded,
+    Has_Book_Encoded) the raw encoded value has no such "neutral" meaning —
+    0 and 1 are just labels, not distances from an average. Multiplying the
+    raw value directly by the coefficient means the reference category
+    (whichever one happens to be encoded as 0) always scores exactly 0, even
+    when that category is the worse one. For example "Not Own Book" is
+    encoded as 0, so with the old formula it always showed a 0 contribution
+    and was incorrectly bucketed as "already working well" instead of being
+    flagged as a risk factor. Instead, categorical features are scored
+    relative to their best-outcome category (best = 1 if the coefficient is
+    positive, else 0), so being in the worse category always correctly
+    shows up as a negative contribution.
+    """
+    preprocessor = logreg_model.named_steps["preprocessor"]
+    transformed = preprocessor.transform(input_row)  # numeric(scaled) + passthrough
+    coefficients = feature_config["logreg_coefficients"]
+    feature_order = feature_config["feature_order"]
+    categorical_features = set(
+        feature_config.get("categorical_encoded_features", ["School_Type_Encoded", "Has_Book_Encoded"])
+    )
 
-Run locally:
-    streamlit run app.py
-"""
+    contributions = {}
+    for i, feat in enumerate(feature_order):
+        value = float(transformed[0][i])
+        coef = float(coefficients[feat])
 
-import json
-import os
-from datetime import datetime
-from io import BytesIO
+        if feat in categorical_features:
+            best_value = 1.0 if coef > 0 else 0.0
+            contributions[feat] = (value - best_value) * coef
+        else:
+            contributions[feat] = value * coef
 
-import joblib
-import numpy as np
-import pandas as pd
-import streamlit as st
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle
+    return contributionsfrom reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle
 from reportlab.lib import colors
 
 # --------------------------------------------------------------------------- #
