@@ -402,7 +402,7 @@ def generate_pdf_report(
 try:
     logreg_model, rf_model, feature_config, stored_metrics = load_artifacts()
     load_error = None
-except Exception as exc:  # noqa: BLE001
+except Exception as exc:  
     logreg_model = rf_model = feature_config = stored_metrics = None
     load_error = str(exc)
 
@@ -421,7 +421,7 @@ model_choice = st.sidebar.radio(
 st.sidebar.markdown("---")
 st.sidebar.caption(
     "MODEL DEVELOPERS:                 "
-    "*ELIHUDI TUMAINI ELIAMINI*.                      "
+    "*ELIHUDI TUMAINI ELIAMINI*.          &             "
     "*ERENEST DAVIS MANYAMA*."
 
 )
@@ -560,7 +560,7 @@ with tab_predict:
                 prediction, probability_pass, contributions, raw_values, language
             )
 
-            download_label = " Download Student Report (PDF)" if language == "English" else "📥 Pakua Ripoti ya Mwanafunzi (PDF)"
+            download_label = " Download Student Report (PDF)" if language == "English" else " Pakua Ripoti ya Mwanafunzi (PDF)"
             st.download_button(
                 label=download_label,
                 data=pdf_buffer,
@@ -568,7 +568,7 @@ with tab_predict:
                 mime="application/pdf"
             )
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc: 
             st.error(f"Something went wrong while generating the prediction: {exc}")
 
 # --------------------------------------------------------------------------- #
