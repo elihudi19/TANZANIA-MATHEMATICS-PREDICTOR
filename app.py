@@ -232,7 +232,7 @@ def strength_note_for(feature, value_raw, lang="English"):
         "Attendance": f"Attendance at {value_raw}% is strong and supporting the prediction well.",
         "Mock_Score": "The mock examination grade is a strong positive signal, maintain this momentum.",
         "School_Type_Encoded": "This school type have good studying environment which contribute to pass Status.",
-        "Has_Book_Encoded": "Owning a Mathematics textbook is helping this student's chances — make sure it's being put to regular use.",
+        "Has_Book_Encoded": "Owning a Mathematics textbook is helping this student's chances, make sure it's being put to regular use.",
     }
     notes_sw = {
         "Teacher-to-student ratio": f"Uwiano wa {value_raw}:1 ni mzuri — endelea hivyo.",
@@ -388,7 +388,7 @@ def generate_pdf_report(
         for feat, contrib in positive_factors:
             friendly = FRIENDLY_NAMES.get(feat, feat)
             note = strength_note_for(feat, raw_values[feat], lang=language)
-            story.append(Paragraph(f"<b>{friendly}</b> — {note}", styles['Normal']))
+            story.append(Paragraph(f"<b>{friendly}</b> : {note}", styles['Normal']))
             story.append(Spacer(1, 0.08*inch))
 
     doc.build(story)
