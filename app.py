@@ -25,6 +25,7 @@ Run locally:
 import json
 import os
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from io import BytesIO
 
 import joblib
@@ -275,7 +276,8 @@ def generate_pdf_report(
     story.append(Paragraph(report_title, title_style))
     story.append(Spacer(1, 0.2*inch))
 
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now(ZoneInfo("Africa/Nairobi")).strftime("%Y-%m-%d %H:%M:%S")
+    print(timestamp)
     story.append(Paragraph(f"<b>Generated:</b> {timestamp}", styles['Normal']))
     story.append(Spacer(1, 0.2*inch))
 
@@ -418,8 +420,8 @@ model_choice = st.sidebar.radio(
 )
 st.sidebar.markdown("---")
 st.sidebar.caption(
-    "MODEL DEVELOPERS: "
-    "*ELIHUDI TUMAINI ELIAMINI*."
+    "MODEL DEVELOPERS:                 "
+    "*ELIHUDI TUMAINI ELIAMINI*.                      "
     "*ERENEST DAVIS MANYAMA*."
 
 )
