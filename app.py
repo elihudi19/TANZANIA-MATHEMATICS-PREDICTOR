@@ -1,49 +1,40 @@
-def compute_contributions(input_row, logreg_model, feature_config):
-    """
-    Standardize the numeric inputs using the SAME fitted scaler used at
-    training time, then multiply by the logistic regression coefficients to
-    get each variable's contribution to the log-odds of passing.
-    A negative contribution means that variable is currently pushing the
-    student toward failing; a positive (or zero) contribution means that
-    variable is at, or pushing toward, its best possible state.
+"""
+app.py
+------
+Mwanza Mathematics Performance Prediction System.
 
-    For scaled numeric features (Teacher-to-student ratio, Attendance,
-    Mock_Score) the contribution is simply scaled_value * coefficient, since
-    0 on the standardized scale represents the dataset average.
+A Streamlit web app that predicts whether a Form Four student in the Mwanza
+Region is likely to PASS or FAIL the NECTA Mathematics examination, using
+either a Logistic Regression or a Random Forest model. The app also produces
+a probability score and a personalised improvement-suggestion list built by
+analysing which input variables are pulling the prediction down.
 
-    For categorical 0/1 encoded features (School_Type_Encoded,
-    Has_Book_Encoded) the raw encoded value has no such "neutral" meaning —
-    0 and 1 are just labels, not distances from an average. Multiplying the
-    raw value directly by the coefficient means the reference category
-    (whichever one happens to be encoded as 0) always scores exactly 0, even
-    when that category is the worse one. For example "Not Own Book" is
-    encoded as 0, so with the old formula it always showed a 0 contribution
-    and was incorrectly bucketed as "already working well" instead of being
-    flagged as a risk factor. Instead, categorical features are scored
-    relative to their best-outcome category (best = 1 if the coefficient is
-    positive, else 0), so being in the worse category always correctly
-    shows up as a negative contribution.
-    """
-    preprocessor = logreg_model.named_steps["preprocessor"]
-    transformed = preprocessor.transform(input_row)  # numeric(scaled) + passthrough
-    coefficients = feature_config["logreg_coefficients"]
-    feature_order = feature_config["feature_order"]
-    categorical_features = set(
-        feature_config.get("categorical_encoded_features", ["School_Type_Encoded", "Has_Book_Encoded"])
-    )
+Folder expected next to this file:
+    model_artifacts/
+        logistic_model.pkl
+        random_forest_model.pkl
+        feature_config.pkl
+        metrics.json
+        confusion_matrix_logreg.png
+        confusion_matrix_rf.png
 
-    contributions = {}
-    for i, feat in enumerate(feature_order):
-        value = float(transformed[0][i])
-        coef = float(coefficients[feat])
+Run locally:
+    streamlit run app.py
+"""
 
-        if feat in categorical_features:
-            best_value = 1.0 if coef > 0 else 0.0
-            contributions[feat] = (value - best_value) * coef
-        else:
-            contributions[feat] = value * coef
+import json
+import os
+from datetime import datetime
+from io import BytesIO
 
-    return contributionsfrom reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle
+import joblib
+import numpy as np
+import pandas as pd
+import streamlit as st
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle
 from reportlab.lib import colors
 
 # --------------------------------------------------------------------------- #
@@ -138,16 +129,41 @@ def compute_contributions(input_row, logreg_model, feature_config):
     training time, then multiply by the logistic regression coefficients to
     get each variable's contribution to the log-odds of passing.
     A negative contribution means that variable is currently pushing the
-    student toward failing; a positive contribution pushes toward passing.
+    student toward failing; a positive (or zero) contribution means that
+    variable is at, or pushing toward, its best possible state.
+
+    For scaled numeric features (Teacher-to-student ratio, Attendance,
+    Mock_Score) the contribution is simply scaled_value * coefficient, since
+    0 on the standardized scale represents the dataset average.
+
+    For categorical 0/1 encoded features (School_Type_Encoded,
+    Has_Book_Encoded) the raw encoded value has no such "neutral" meaning —
+    0 and 1 are just labels, not distances from an average. Multiplying the
+    raw value directly by the coefficient means the reference category
+    (whichever one happens to be encoded as 0) always scores exactly 0, even
+    when that category is the worse one. Instead, categorical features are
+    scored relative to their best-outcome category (best = 1 if the
+    coefficient is positive, else 0), so being in the worse category always
+    correctly shows up as a negative contribution.
     """
     preprocessor = logreg_model.named_steps["preprocessor"]
     transformed = preprocessor.transform(input_row)  # numeric(scaled) + passthrough
     coefficients = feature_config["logreg_coefficients"]
     feature_order = feature_config["feature_order"]
+    categorical_features = set(
+        feature_config.get("categorical_encoded_features", ["School_Type_Encoded", "Has_Book_Encoded"])
+    )
 
     contributions = {}
     for i, feat in enumerate(feature_order):
-        contributions[feat] = float(transformed[0][i]) * float(coefficients[feat])
+        value = float(transformed[0][i])
+        coef = float(coefficients[feat])
+
+        if feat in categorical_features:
+            best_value = 1.0 if coef > 0 else 0.0
+            contributions[feat] = (value - best_value) * coef
+        else:
+            contributions[feat] = value * coef
 
     return contributions
 
@@ -163,27 +179,6 @@ FRIENDLY_NAMES = {
 
 def suggestion_for(feature, value_raw, lang="English"):
     """Return an actionable suggestion string for a risk factor, in the chosen language."""
-    # Special handling for Has_Book_Encoded to check the actual value
-    if feature == "Has_Book_Encoded":
-        if value_raw == "Own a Book":
-            # This shouldn't be a risk factor if student owns a book, but handle it anyway
-            if lang == "English":
-                return "The student owns a Mathematics textbook, which is positive. Ensure it is being used effectively."
-            else:
-                return "Mwanafunzi ana kitabu cha Hisabati, ambayo ni kitu kizuri. Hakikisha kuwa kinatumiwa kwa ufanisi."
-        else:  # "Not Own Book"
-            if lang == "English":
-                return (
-                    "The student does not currently own a Mathematics textbook. "
-                    "Providing access to a textbook (personal, borrowed, or library copy) is strongly "
-                    "associated with better outcomes."
-                )
-            else:
-                return (
-                    "Mwanafunzi hana kitabu cha Hisabati kwa sasa. "
-                    "Kupata kitabu (binafsi, mkopo, au cha maktaba) kunahusiana sana na matokeo bora."
-                )
-    
     suggestions_en = {
         "Teacher-to-student ratio": (
             f"The teacher-to-student ratio ({value_raw}:1) is high. Advocate for smaller "
@@ -201,6 +196,10 @@ def suggestion_for(feature, value_raw, lang="English"):
         "School_Type_Encoded": (
             "The school type is associated with historically lower NECTA pass rates in this "
             "dataset. Extra resource support (learning materials, tutoring) can help offset this."
+        ),
+        "Has_Book_Encoded": (
+            "The student does not currently own a Mathematics textbook. Providing access to a "
+            "textbook (personal, borrowed, or library copy) is strongly associated with better outcomes."
         ),
     }
     suggestions_sw = {
@@ -221,6 +220,10 @@ def suggestion_for(feature, value_raw, lang="English"):
             "Aina ya shule inahusiana na kiwango cha chini cha ufaulu wa NECTA kwenye data hii. "
             "Msaada wa ziada wa vifaa vya kujifunzia na ufundishaji unaweza kusaidia."
         ),
+        "Has_Book_Encoded": (
+            "Mwanafunzi hana kitabu cha Hisabati kwa sasa. Kupata kitabu (binafsi, mkopo, au "
+            "cha maktaba) kunahusiana sana na matokeo bora."
+        ),
     }
     table = suggestions_en if lang == "English" else suggestions_sw
     return table.get(feature, "Review this factor with a teacher for tailored advice.")
@@ -228,30 +231,19 @@ def suggestion_for(feature, value_raw, lang="English"):
 
 def strength_note_for(feature, value_raw, lang="English"):
     """Positive reinforcement message for factors already working in the student's favor."""
-    # Special handling for Has_Book_Encoded based on actual value
-    if feature == "Has_Book_Encoded":
-        if value_raw == "Own a Book":
-            if lang == "English":
-                return "Owning a Mathematics textbook (Own a Book) is helping this student's chances."
-            else:
-                return "Kumiliki kitabu cha Hisabati (Own a Book) kunamsaidia mwanafunzi huyu."
-        else:  # "Not Own Book" - should not appear as positive factor, but handle gracefully
-            if lang == "English":
-                return "Access to Mathematics learning materials is important for success."
-            else:
-                return "Ufikiaji wa vifaa vya kujifunza Hisabati ni muhimu kwa ufaulu."
-    
     notes_en = {
         "Teacher-to-student ratio": f"A teacher-to-student ratio of {value_raw}:1 is favorable — keep it up.",
         "Attendance": f"Attendance at {value_raw}% is strong and supporting the prediction well.",
         "Mock_Score": "The mock examination grade is a strong positive signal — maintain this momentum.",
         "School_Type_Encoded": "The school type is currently working in the student's favor.",
+        "Has_Book_Encoded": "Owning a Mathematics textbook is helping this student's chances — make sure it's being put to regular use.",
     }
     notes_sw = {
         "Teacher-to-student ratio": f"Uwiano wa {value_raw}:1 ni mzuri — endelea hivyo.",
         "Attendance": f"Mahudhurio ya {value_raw}% ni mazuri na yanasaidia matokeo.",
         "Mock_Score": "Alama ya mock ni ishara nzuri — endelea na kasi hiyo.",
         "School_Type_Encoded": "Aina ya shule kwa sasa inamsaidia mwanafunzi huyu.",
+        "Has_Book_Encoded": "Kumiliki kitabu cha Hisabati kunamsaidia mwanafunzi huyu — hakikisha kinatumika mara kwa mara.",
     }
     table = notes_en if lang == "English" else notes_sw
     return table.get(feature, "This factor is currently helping.")
@@ -267,14 +259,13 @@ def generate_pdf_report(
     styles = getSampleStyleSheet()
     story = []
 
-    # Custom styles
     title_style = ParagraphStyle(
         'CustomTitle',
         parent=styles['Heading1'],
         fontSize=18,
         textColor=colors.HexColor('#1f77b4'),
         spaceAfter=12,
-        alignment=1  # center
+        alignment=1
     )
     heading_style = ParagraphStyle(
         'CustomHeading',
@@ -285,17 +276,14 @@ def generate_pdf_report(
         spaceBefore=10
     )
 
-    # Title
     report_title = "Mwanza Mathematics Performance Prediction Report" if language == "English" else "Ripoti ya Utabiri wa Utendaji wa Hisabati wa Mwanza"
     story.append(Paragraph(report_title, title_style))
     story.append(Spacer(1, 0.2*inch))
 
-    # Generate timestamp
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     story.append(Paragraph(f"<b>Generated:</b> {timestamp}", styles['Normal']))
     story.append(Spacer(1, 0.2*inch))
 
-    # Student Information Section
     info_title = "Student Information" if language == "English" else "Habari za Mwanafunzi"
     story.append(Paragraph(info_title, heading_style))
 
@@ -328,7 +316,6 @@ def generate_pdf_report(
     story.append(t)
     story.append(Spacer(1, 0.3*inch))
 
-    # Prediction Result Section
     result_title = "Prediction Result" if language == "English" else "Matokeo ya Utabiri"
     story.append(Paragraph(result_title, heading_style))
 
@@ -361,7 +348,6 @@ def generate_pdf_report(
     story.append(t2)
     story.append(Spacer(1, 0.3*inch))
 
-    # Suggestions Section
     sugg_title = "Personalised Suggestions" if language == "English" else "Ushauri wa Kibinafsi"
     story.append(Paragraph(sugg_title, heading_style))
 
@@ -393,7 +379,6 @@ def generate_pdf_report(
             story.append(Paragraph(text, styles['Normal']))
             story.append(Spacer(1, 0.1*inch))
 
-    # Build PDF
     doc.build(story)
     pdf_buffer.seek(0)
     return pdf_buffer
@@ -405,7 +390,7 @@ def generate_pdf_report(
 try:
     logreg_model, rf_model, feature_config, stored_metrics = load_artifacts()
     load_error = None
-except Exception as exc:  # noqa: BLE001 - want to show any load error in the UI
+except Exception as exc:  # noqa: BLE001
     logreg_model = rf_model = feature_config = stored_metrics = None
     load_error = str(exc)
 
@@ -478,7 +463,7 @@ with tab_predict:
             has_book = st.selectbox("Does the student own a Mathematics book?", ["Own a Book", "Not Own Book"])
             mock_grade = st.selectbox("Mock examination grade", ["A", "B", "C", "D", "F"])
 
-            st.markdown("")  # spacing
+            st.markdown("")
             predict_clicked = st.form_submit_button("Predict Result", type="primary")
 
     if predict_clicked:
@@ -505,12 +490,6 @@ with tab_predict:
                 st.metric("Probability of Passing", f"{probability_pass * 100:.1f}%")
                 st.progress(min(max(probability_pass, 0.0), 1.0))
 
-            # --------------------------------------------------------- #
-            # Suggestion engine (always explained via Logistic Regression
-            # coefficients, since they are directly interpretable as
-            # log-odds contributions, regardless of which model was used
-            # to generate the headline prediction).
-            # --------------------------------------------------------- #
             st.markdown("---")
             st.subheader(
                 "💡 Personalised Suggestions" if language == "English" else "💡 Ushauri wa Kibinafsi"
@@ -525,210 +504,6 @@ with tab_predict:
                 "Has_Book_Encoded": has_book,
             }
 
-            # Sort ascending: most negative (biggest risk) first
-            sorted_factors = sorted(contributions.items(), key=lambda kv: kv[1])
-
-            # EXCLUDE Has_Book_Encoded from the general risk/positive factor lists
-            risk_factors = [f for f in sorted_factors if f[1] < 0 and f[0] != "Has_Book_Encoded"]
-            positive_factors = [f for f in sorted_factors if f[1] >= 0 and f[0] != "Has_Book_Encoded"]
-
-            if not risk_factors:
-                msg = (
-                    "All measured factors are currently working in this student's favor. "
-                    "Keep up the strong routine!"
-                    if language == "English"
-                    else "Vigezo vyote vinavyopimwa kwa sasa vinamsaidia mwanafunzi huyu. "
-                    "Endelea na mwenendo huu mzuri!"
-                )
-                st.info(msg)
-            else:
-                st.write(
-                    "Focus on these areas first, ranked from most to least impactful:"
-                    if language == "English"
-                    else "Anza na maeneo haya, kwa mpangilio wa athari kubwa hadi ndogo:"
-                )
-                for i, (feat, contrib) in enumerate(risk_factors[:3], start=1):
-                    friendly = FRIENDLY_NAMES.get(feat, feat)
-                    text = suggestion_for(feat, raw_values[feat], lang=language)
-                    st.markdown(f"**{i}. {friendly}** — {text}")
-
-            # ========================================================== #
-            # ALWAYS SHOW MATHEMATICS BOOK RECOMMENDATION SEPARATELY
-            # ========================================================== #
-            st.markdown("---")
-            book_title = "📚 Mathematics Book Recommendation" if language == "English" else "📚 Ushauri wa Kitabu cha Hisabati"
-            st.subheader(book_title)
-            
-            book_contrib = contributions.get("Has_Book_Encoded", 0)
-            book_status = raw_values["Has_Book_Encoded"]
-            
-            if book_contrib < 0:
-                # Student doesn't have a book - show improvement suggestion (warning)
-                book_text = suggestion_for("Has_Book_Encoded", book_status, lang=language)
-                st.warning(f"**{FRIENDLY_NAMES['Has_Book_Encoded']}** — {book_text}")
-            else:
-                # Student has a book - show positive reinforcement (success)
-                book_text = strength_note_for("Has_Book_Encoded", book_status, lang=language)
-                st.success(f"**{FRIENDLY_NAMES['Has_Book_Encoded']}** — {book_text}")
-
-            # ========================================================== #
-
-            if positive_factors:
-                with st.expander(
-                    "✅ Factors already working well" if language == "English" else "✅ Mambo yanayosaidia tayari"
-                ):
-                    for feat, contrib in positive_factors:
-                        friendly = FRIENDLY_NAMES.get(feat, feat)
-                        note = strength_note_for(feat, raw_values[feat], lang=language)
-                        st.markdown(f"- **{friendly}** — {note}")
-
-            with st.expander("See raw contribution scores (advanced)"):
-                contrib_df = pd.DataFrame(
-                    [
-                        {"Feature": FRIENDLY_NAMES.get(f, f), "Log-odds contribution": round(c, 4)}
-                        for f, c in sorted_factors
-                    ]
-                )
-                st.dataframe(contrib_df, use_container_width=True, hide_index=True)
-
-            # --------------------------------------------------------- #
-            # PDF Download Button
-            # --------------------------------------------------------- #
-            st.markdown("---")
-            pdf_buffer = generate_pdf_report(
-                school_type, ratio, attendance, has_book, mock_grade, model_choice,
-                prediction, probability_pass, contributions, raw_values, language
-            )
-            
-            download_label = "📥 Download Student Report (PDF)" if language == "English" else "📥 Pakua Ripoti ya Mwanafunzi (PDF)"
-            st.download_button(
-                label=download_label,
-                data=pdf_buffer,
-                file_name=f"student_prediction_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                mime="application/pdf"
-            )
-
-        except Exception as exc:  # noqa: BLE001
-            st.error(f"Something went wrong while generating the prediction: {exc}")
-
-# --------------------------------------------------------------------------- #
-# Model performance tab
-# --------------------------------------------------------------------------- #
-with tab_performance:
-    st.subheader("Model Evaluation Metrics")
-    st.caption(
-        f"Evaluated on a held-out test set of {stored_metrics.get('test_size', 'N/A')} "
-        f"students (out of {stored_metrics.get('dataset_size', 'N/A')} total records)."
-    )
-
-    metric_col1, metric_col2 = st.columns(2)
-
-    for col, key, title, cm_file in [
-        (metric_col1, "logistic_regression", "Logistic Regression", "confusion_matrix_logreg.png"),
-        (metric_col2, "random_forest", "Random Forest", "confusion_matrix_rf.png"),
-    ]:
-        with col:
-            st.markdown(f"#### {title}")
-            m = stored_metrics.get(key, {})
-            st.write(f"**Accuracy:** {m.get('accuracy', 'N/A') * 100:.2f}%" if m.get("accuracy") is not None else "N/A")
-            st.write(f"**Precision:** {m.get('precision', 'N/A')}")
-            st.write(f"**Recall:** {m.get('recall', 'N/A')}")
-            st.write(f"**F1 Score:** {m.get('f1_score', 'N/A')}")
-
-            cm_path = os.path.join(ARTIFACT_DIR, cm_file)
-            if os.path.exists(cm_path):
-                st.image(cm_path, caption=f"{title} Confusion Matrix", use_container_width=True)
-            else:
-                st.warning(f"Confusion matrix image not found: {cm_path}")
-
-    st.markdown("---")
-    st.caption(
-        "Note: the suggestion engine always uses the Logistic Regression coefficients "
-        "to explain factor contributions, since they are directly interpretable as "
-        "log-odds — even when Random Forest is selected for the headline prediction."
-    )
-
-tab_predict, tab_performance = st.tabs(["🔮 Prediction", "📊 Model Performance"])
-
-# --------------------------------------------------------------------------- #
-# Prediction tab
-# --------------------------------------------------------------------------- #
-with tab_predict:
-    with st.form(key="metrics_form"):
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.subheader("Input Parameters")
-            school_type = st.selectbox("School Type", ["Private", "Government"])
-
-            ratio = st.number_input(
-                label="Teacher-to-student ratio (students per teacher)",
-                min_value=50,
-                max_value=300,
-                value=100,
-                step=1,
-            )
-
-            attendance = st.number_input(
-                label="Attendance rate (%)",
-                min_value=50,
-                max_value=99,
-                value=80,
-                step=1,
-            )
-
-        with col2:
-            has_book = st.selectbox("Does the student own a Mathematics book?", ["Own a Book", "Not Own Book"])
-            mock_grade = st.selectbox("Mock examination grade", ["A", "B", "C", "D", "F"])
-
-            st.markdown("")  # spacing
-            predict_clicked = st.form_submit_button("Predict Result", type="primary")
-
-    if predict_clicked:
-        try:
-            input_row = build_input_row(
-                school_type, ratio, attendance, has_book, mock_grade, feature_config
-            )
-
-            chosen_model = logreg_model if model_choice == "Logistic Regression" else rf_model
-            prediction = int(chosen_model.predict(input_row)[0])
-            probability_pass = float(chosen_model.predict_proba(input_row)[0][1])
-
-            st.markdown("---")
-            result_col, prob_col = st.columns([1, 1])
-
-            with result_col:
-                if prediction == 1:
-                    st.success("### ✅ Predicted Result: PASS")
-                else:
-                    st.error("### ❌ Predicted Result: FAIL")
-                st.caption(f"Model used: {model_choice}")
-
-            with prob_col:
-                st.metric("Probability of Passing", f"{probability_pass * 100:.1f}%")
-                st.progress(min(max(probability_pass, 0.0), 1.0))
-
-            # --------------------------------------------------------- #
-            # Suggestion engine (always explained via Logistic Regression
-            # coefficients, since they are directly interpretable as
-            # log-odds contributions, regardless of which model was used
-            # to generate the headline prediction).
-            # --------------------------------------------------------- #
-            st.markdown("---")
-            st.subheader(
-                "💡 Personalised Suggestions" if language == "English" else "💡 Ushauri wa Kibinafsi"
-            )
-
-            contributions = compute_contributions(input_row, logreg_model, feature_config)
-            raw_values = {
-                "Teacher-to-student ratio": ratio,
-                "Attendance": attendance,
-                "Mock_Score": mock_grade,
-                "School_Type_Encoded": school_type,
-                "Has_Book_Encoded": has_book,
-            }
-
-            # Sort ascending: most negative (biggest risk) first
             sorted_factors = sorted(contributions.items(), key=lambda kv: kv[1])
 
             risk_factors = [f for f in sorted_factors if f[1] < 0]
@@ -772,15 +547,12 @@ with tab_predict:
                 )
                 st.dataframe(contrib_df, use_container_width=True, hide_index=True)
 
-            # --------------------------------------------------------- #
-            # PDF Download Button
-            # --------------------------------------------------------- #
             st.markdown("---")
             pdf_buffer = generate_pdf_report(
                 school_type, ratio, attendance, has_book, mock_grade, model_choice,
                 prediction, probability_pass, contributions, raw_values, language
             )
-            
+
             download_label = "📥 Download Student Report (PDF)" if language == "English" else "📥 Pakua Ripoti ya Mwanafunzi (PDF)"
             st.download_button(
                 label=download_label,
