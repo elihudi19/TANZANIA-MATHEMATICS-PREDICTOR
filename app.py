@@ -543,7 +543,7 @@ with tab_predict:
                 for i, (feat, contrib) in enumerate(risk_factors, start=1):
                     friendly = FRIENDLY_NAMES.get(feat, feat)
                     text = suggestion_for(feat, raw_values[feat], lang=language)
-                    st.markdown(f"**{i}. {friendly}** — {text}")
+                    st.markdown(f"**{i}. {friendly}** :  {text}")
 
             if positive_factors:
                 with st.expander(
@@ -552,7 +552,7 @@ with tab_predict:
                     for feat, contrib in positive_factors:
                         friendly = FRIENDLY_NAMES.get(feat, feat)
                         note = strength_note_for(feat, raw_values[feat], lang=language)
-                        st.markdown(f"- **{friendly}** — {note}")
+                        st.markdown(f"- **{friendly}** :  {note}")
 
             st.markdown("---")
             pdf_buffer = generate_pdf_report(
