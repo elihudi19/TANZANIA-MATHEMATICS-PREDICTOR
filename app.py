@@ -213,8 +213,8 @@ def suggestion_for(feature, value_raw, lang="English"):
             "Weka mkazo kwenye mada zilizoshindwa kwenye mock na fanya mazoezi ya maswali ya nyuma."
         ),
         "School_Type_Encoded": (
-            "Aina ya shule inahusiana na kiwango cha chini cha ufaulu wa NECTA kwenye data hii. "
-            "Msaada wa ziada wa vifaa vya kujifunzia na ufundishaji unaweza kusaidia."
+            ​"This school type is hindered by poor studying environment, such as limited study hours."
+            "Make sure you clearly arrange your timetable to have enough studying time."
         ),
         "Has_Book_Encoded": (
             "Mwanafunzi hana kitabu cha Hisabati kwa sasa. Kupata kitabu (binafsi, mkopo, au "
