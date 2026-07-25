@@ -182,15 +182,15 @@ def suggestion_for(feature, value_raw, lang="English"):
         ),
         "Attendance": (
             f"Attendance is at {value_raw}%. Improving regular class attendance is one of "
-            "the strongest levers for exam performance — aim to close any attendance gaps."
+            "the strongest levers for exam performance, aim to close any attendance gaps."
         ),
         "Mock_Score": (
             "The mock examination result suggests weak readiness. Focus revision on the "
             "topics missed in the mock exam and consider a structured past-papers practice plan."
         ),
         "School_Type_Encoded": (
-            "The school type is associated with historically lower NECTA pass rates in this "
-            "dataset. Extra resource support (learning materials, tutoring) can help offset this."
+            "Aina hii ya shule inakwamishwa na mazingira duni ya kujisomea kama vile saa chache za kujisomea."
+            "Hakikisha unapanga vizuri ratiba yako ili uwe na muda wa kutosha wa kujisomea."
         ),
         "Has_Book_Encoded": (
             "The student does not currently own a Mathematics textbook. Providing access to a "
@@ -227,18 +227,18 @@ def suggestion_for(feature, value_raw, lang="English"):
 def strength_note_for(feature, value_raw, lang="English"):
     """Positive reinforcement message for factors already working in the student's favor."""
     notes_en = {
-        "Teacher-to-student ratio": f"A teacher-to-student ratio of {value_raw}:1 is favorable — keep it up.",
+        "Teacher-to-student ratio": f"A teacher-to-student ratio of {value_raw}:1 is favorable in passing status.",
         "Attendance": f"Attendance at {value_raw}% is strong and supporting the prediction well.",
-        "Mock_Score": "The mock examination grade is a strong positive signal — maintain this momentum.",
-        "School_Type_Encoded": "The school type is currently working in the student's favor.",
+        "Mock_Score": "The mock examination grade is a strong positive signal, maintain this momentum.",
+        "School_Type_Encoded": "This school type have good studying environment which contribute to pass Status.",
         "Has_Book_Encoded": "Owning a Mathematics textbook is helping this student's chances — make sure it's being put to regular use.",
     }
     notes_sw = {
         "Teacher-to-student ratio": f"Uwiano wa {value_raw}:1 ni mzuri — endelea hivyo.",
         "Attendance": f"Mahudhurio ya {value_raw}% ni mazuri na yanasaidia matokeo.",
-        "Mock_Score": "Alama ya mock ni ishara nzuri — endelea na kasi hiyo.",
-        "School_Type_Encoded": "Aina ya shule kwa sasa inamsaidia mwanafunzi huyu.",
-        "Has_Book_Encoded": "Kumiliki kitabu cha Hisabati kunamsaidia mwanafunzi huyu — hakikisha kinatumika mara kwa mara.",
+        "Mock_Score": "Alama ya mock ni ishara nzuri, endelea na kasi hiyo.",
+        "School_Type_Encoded": "Aina ya shule hii ina mazingira mazuri ya usomaji yanayomsaidia mwanafunzi huyu kufaulu.",
+        "Has_Book_Encoded": "Kumiliki kitabu cha Hisabati kunamsaidia mwanafunzi huyu, hakikisha kinatumika mara kwa mara.",
     }
     table = notes_en if lang == "English" else notes_sw
     return table.get(feature, "This factor is currently helping.")
@@ -314,7 +314,7 @@ def generate_pdf_report(
     result_title = "Prediction Result" if language == "English" else "Matokeo ya Utabiri"
     story.append(Paragraph(result_title, heading_style))
 
-    result_text = "PASS ✅" if prediction == 1 else "FAIL ❌"
+    result_text = "PASS " if prediction == 1 else "FAIL"
     prob_text = f"{probability_pass * 100:.1f}%"
     model_text = f"Model: {model_choice}"
 
@@ -380,7 +380,7 @@ def generate_pdf_report(
     positive_factors = [f for f in sorted_factors if f[1] >= 0]
     if positive_factors:
         story.append(Spacer(1, 0.15*inch))
-        strengths_title = "✅ Factors Already Working Well" if language == "English" else "✅ Mambo Yanayosaidia Tayari"
+        strengths_title = " Factors Already Working Well" if language == "English" else "Mambo Yanayosaidia Tayari"
         story.append(Paragraph(strengths_title, heading_style))
 
         for feat, contrib in positive_factors:
@@ -418,8 +418,10 @@ model_choice = st.sidebar.radio(
 )
 st.sidebar.markdown("---")
 st.sidebar.caption(
-    "Built for the EASTC Bachelor of Data Science capstone: "
-    "*Mwanza Mathematics Performance Prediction System*."
+    "MODEL DEVELOPERS: "
+    "*ELIHUDI TUMAINI ELIAMINI*."
+    "*ERENEST DAVIS MANYAMA*."
+
 )
 
 # --------------------------------------------------------------------------- #
@@ -440,7 +442,7 @@ if load_error:
     )
     st.stop()
 
-tab_predict, tab_performance = st.tabs(["🔮 Prediction", "📊 Model Performance"])
+tab_predict, tab_performance = st.tabs([" Prediction", "📊 Model Performance"])
 
 # --------------------------------------------------------------------------- #
 # Prediction tab
@@ -450,21 +452,21 @@ with tab_predict:
         col1, col2 = st.columns(2)
 
         with col1:
-            st.subheader("Input Parameters")
+            st.subheader("ENTER STUDENT's INFORMATION")
             school_type = st.selectbox("School Type", ["Private", "Government"])
 
             ratio = st.number_input(
                 label="Teacher-to-student ratio (students per teacher)",
-                min_value=50,
-                max_value=300,
+                min_value=10,
+                max_value=1000,
                 value=100,
                 step=1,
             )
 
             attendance = st.number_input(
                 label="Attendance rate (%)",
-                min_value=50,
-                max_value=99,
+                min_value=1,
+                max_value=100,
                 value=80,
                 step=1,
             )
@@ -491,9 +493,9 @@ with tab_predict:
 
             with result_col:
                 if prediction == 1:
-                    st.success("### ✅ Predicted Result: PASS")
+                    st.success("###  Predicted Result: PASS")
                 else:
-                    st.error("### ❌ Predicted Result: FAIL")
+                    st.error("###  Predicted Result: FAIL")
                 st.caption(f"Model used: {model_choice}")
 
             with prob_col:
@@ -502,7 +504,7 @@ with tab_predict:
 
             st.markdown("---")
             st.subheader(
-                "💡 Personalised Suggestions" if language == "English" else "💡 Ushauri wa Kibinafsi"
+                "Personalised Suggestions" if language == "English" else " Ushauri wa Kibinafsi"
             )
 
             contributions = compute_contributions(input_row, logreg_model, feature_config)
@@ -543,7 +545,7 @@ with tab_predict:
 
             if positive_factors:
                 with st.expander(
-                    "✅ Factors already working well" if language == "English" else "✅ Mambo yanayosaidia tayari"
+                    " Factors already working well" if language == "English" else " Mambo yanayosaidia tayari"
                 ):
                     for feat, contrib in positive_factors:
                         friendly = FRIENDLY_NAMES.get(feat, feat)
@@ -556,7 +558,7 @@ with tab_predict:
                 prediction, probability_pass, contributions, raw_values, language
             )
 
-            download_label = "📥 Download Student Report (PDF)" if language == "English" else "📥 Pakua Ripoti ya Mwanafunzi (PDF)"
+            download_label = " Download Student Report (PDF)" if language == "English" else "📥 Pakua Ripoti ya Mwanafunzi (PDF)"
             st.download_button(
                 label=download_label,
                 data=pdf_buffer,
@@ -587,9 +589,9 @@ with tab_performance:
             st.markdown(f"#### {title}")
             m = stored_metrics.get(key, {})
             st.write(f"**Accuracy:** {m.get('accuracy', 'N/A') * 100:.2f}%" if m.get("accuracy") is not None else "N/A")
-            st.write(f"**Precision:** {m.get('precision', 'N/A')}")
-            st.write(f"**Recall:** {m.get('recall', 'N/A')}")
-            st.write(f"**F1 Score:** {m.get('f1_score', 'N/A')}")
+            st.write(f"**Precision:** {m.get('precision', 'N/A') * 100:.2f}%")
+            st.write(f"**Recall:** {m.get('recall', 'N/A') * 100:.2f}%")
+            st.write(f"**F1 Score:** {m.get('f1_score', 'N/A') * 100:.2f}%")
 
             cm_path = os.path.join(ARTIFACT_DIR, cm_file)
             if os.path.exists(cm_path):
@@ -597,9 +599,4 @@ with tab_performance:
             else:
                 st.warning(f"Confusion matrix image not found: {cm_path}")
 
-    st.markdown("---")
-    st.caption(
-        "Note: the suggestion engine always uses the Logistic Regression coefficients "
-        "to explain factor contributions, since they are directly interpretable as "
-        "log-odds — even when Random Forest is selected for the headline prediction."
-    )
+    
