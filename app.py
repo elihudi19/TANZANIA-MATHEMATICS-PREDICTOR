@@ -360,14 +360,16 @@ def generate_pdf_report(
         story.append(Paragraph(msg, styles['Normal']))
     else:
         focus_msg = (
-            "Focus on these areas first, ranked from most to least impactful:"
+            "All factors below are currently reducing this student's chance of passing, "
+            "ranked from most to least impactful:"
             if language == "English"
-            else "Anza na maeneo haya, kwa mpangilio wa athari kubwa hadi ndogo:"
+            else "Vigezo vyote hapa chini kwa sasa vinapunguza nafasi ya mwanafunzi kufaulu, "
+            "kwa mpangilio wa athari kubwa hadi ndogo:"
         )
         story.append(Paragraph(focus_msg, styles['Normal']))
         story.append(Spacer(1, 0.15*inch))
 
-        for i, (feat, contrib) in enumerate(risk_factors[:3], start=1):
+        for i, (feat, contrib) in enumerate(risk_factors, start=1):
             friendly = FRIENDLY_NAMES.get(feat, feat)
             text = suggestion_for(feat, raw_values[feat], lang=language)
             story.append(Paragraph(f"<b>{i}. {friendly}</b>", styles['Normal']))
@@ -528,11 +530,13 @@ with tab_predict:
                 st.info(msg)
             else:
                 st.write(
-                    "Focus on these areas first, ranked from most to least impactful:"
+                    "All factors below are currently reducing this student's chance of "
+                    "passing, ranked from most to least impactful:"
                     if language == "English"
-                    else "Anza na maeneo haya, kwa mpangilio wa athari kubwa hadi ndogo:"
+                    else "Vigezo vyote hapa chini kwa sasa vinapunguza nafasi ya mwanafunzi "
+                    "kufaulu, kwa mpangilio wa athari kubwa hadi ndogo:"
                 )
-                for i, (feat, contrib) in enumerate(risk_factors[:3], start=1):
+                for i, (feat, contrib) in enumerate(risk_factors, start=1):
                     friendly = FRIENDLY_NAMES.get(feat, feat)
                     text = suggestion_for(feat, raw_values[feat], lang=language)
                     st.markdown(f"**{i}. {friendly}** — {text}")
